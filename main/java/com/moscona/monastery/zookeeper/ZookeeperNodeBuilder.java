@@ -3,6 +3,7 @@ package com.moscona.monastery.zookeeper;
 import com.moscona.monastery.api.core.Capability;
 import com.moscona.monastery.api.core.Node;
 import com.moscona.monastery.api.core.NodeBuilder;
+import org.apache.curator.framework.CuratorFrameworkFactory;
 import sun.plugin.dom.exception.InvalidStateException;
 
 /**
@@ -10,6 +11,8 @@ import sun.plugin.dom.exception.InvalidStateException;
  * A builder for Zookeeper nodes
  */
 public class ZookeeperNodeBuilder implements NodeBuilder<String> {
+    private CuratorFrameworkFactory curatorFrameworkFactory;
+
     @Override
     public NodeBuilder<String> add(Capability... capabilities) {
         return null;
@@ -19,4 +22,5 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
     public Node<String> build() throws InvalidStateException {
         return null;
     }
+
 }
