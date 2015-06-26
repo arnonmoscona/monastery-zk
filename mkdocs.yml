@@ -1,0 +1,6 @@
+site_name: Monastery/Zookeeper Docs
+repo_url: https://github.com/arnonmoscona/monastery-zk
+site_author: Arnon Moscona
+theme: readthedocs
+pages: ["index.md", "architecture.md", "license.md"]
+
