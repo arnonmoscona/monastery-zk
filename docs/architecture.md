@@ -132,6 +132,12 @@ Then the znode name will be ```hash("Virginia")```. And the znode's data will be
 }
 ```
 
+#### A note on hash collisions
+
+By using a standard hash algorithm, the implementations of maps and sets gives a (very) high degree of confidence that hash collisions would not occur. Having said this, there is still a non-zero probability of a collision. To avoid a collision the implementation first (optionally) tests for a collion, and if one does occur, then it creates another znode with the original hash, plus a suffix. For instance, if the hash value ```"215093cfae6bc7965544f1f1776e728c3a39d0bf841baabbfecd8a137c02d23d"``` ends up colliding, then the implementation will then try ```"215093cfae6bc7965544f1f1776e728c3a39d0bf841baabbfecd8a137c02d23d-1"```, then test that for collision, and increment the suffix until a value is found that does not collide. This way it can provide a near absolute guarantee of no collisions. In fact, if there was only one node, then the guarantee is absolute. Because of parallel execution on multiple nodes there is a super-slim probability that a collision would still happen due to a race condition. While this problem is solvable with distributed locks, the overhead and complexity of using them is deemed "too much".
+
+To allow an override by those who require an absolute guarantee, the implementation packages the algorithm of znode path construction as a strategy that can be replaced as a builder option.
+
 ### A note on performance
 
 The default implementation of data representation is not optimized for the highest possible performance. The purpose of Monastery is to provide a framework for a cluster's control plane. The control plane is *not* where the main work of the cluster is done. That work is done by the services provided by the nodes of the cluster. Control plane operations should not occur too frequently, and therefore should not be fine tuned for performance. They should be simple, easy to understand and as easy to debug as is feasible, under the inherent difficulties of developing distributed code.
