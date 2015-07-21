@@ -10,12 +10,14 @@ import org.junit.Before;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.AfterClass;
+import org.junit.Ignore;
 
 import static org.fest.assertions.api.Assertions.*;
 import org.apache.curator.test.TestingServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
@@ -57,7 +59,15 @@ public class ZookeeperNodeBuilderTest {
 
     @After
     public void after() throws Exception {
-        server.stop();
+        try {
+            if (server != null) {
+                server.stop();
+            } else {
+                System.err.println("sever is null in after() - very strange");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     //------------------------------------------------------------------------------------------------------------------
@@ -113,17 +123,6 @@ public class ZookeeperNodeBuilderTest {
                 withCuratorFramework(cf);
     }
 
-    /**
-     * If neither a Curator framework nor a framework factory is given, the builder can still manage by creating a
-     * default framework factory, provided that sufficient data is provided.
-     * @throws Exception
-     */
-    @Test
-    public void shouldCreateDefaultFrameworkFactory() throws Exception {
-        throw new Exception("missing test for default framework factory before build");
-
-    }
-
     /** 
      * 
      * Method: add(Capability... capabilities) 
@@ -170,7 +169,88 @@ public class ZookeeperNodeBuilderTest {
         assertThat(result).isNotNull();
     }
 
+    /**
+     * If neither a Curator framework nor a framework factory is given, the builder can still manage by creating a
+     * default framework factory, provided that sufficient data is provided.
+     * @throws Exception
+     */
+    @Test
+    @Ignore("Does not make sense, I think. If you don't provide a CuratorFramework then you need at least a connection string. Leaving test around as a reminder that it may be resurrected later.")
+    public void shouldCreateDefaultFrameworkFactory() throws Exception {
+        ZookeeperNode node = (ZookeeperNode) new ZookeeperNodeBuilder().build();
+
+        assertThat(node).isNotNull();
+        assertThat(node.getId().isPresent()).isFalse(); // node ot announced yet
+        assertThat(node.getCuratorFramework()).isNotNull();
+        CompletableFuture<NodeAnnouncement> future = node.getCapability(NodeAnnouncement.class);
+        assertThat(future).isNotNull();
+        NodeAnnouncement result = future.get(1000, TimeUnit.MILLISECONDS); // synchronous is OK in test, besides we expect no network operations in this implementation
+        assertThat(result).isNotNull();
+    }
+
+    /**
+     * The builder should accept a root path for the root ZNode
+     * @throws Exception
+     */
+    @Test
+    public void shouldAcceptRootZNodePath() throws Exception {
+        CuratorFramework cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        String rootPath = "/my/root/path";
+        ZookeeperNodeBuilder builder = new ZookeeperNodeBuilder().
+                withCuratorFramework(cf).
+                withRootPath(rootPath);
+        ZookeeperNode node = (ZookeeperNode) builder.build();
+        assertThat(node).isNotNull();
+        assertThat(node.getRootPath()).isNotNull().isEqualTo(rootPath);
+    }
+
+
+    /**
+     * The builder should have a default path for the root ZNode
+     * @throws Exception
+     */
+    @Test
+    public void shouldHaveDefaultRootZNodePath() throws Exception {
+        CuratorFramework cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        ZookeeperNodeBuilder builder = new ZookeeperNodeBuilder().
+                withCuratorFramework(cf);
+        ZookeeperNode node = (ZookeeperNode) builder.build();
+        assertThat(node).isNotNull();
+        assertThat(node.getRootPath()).isNotNull().isEqualTo("/net.projectmonastery.monastery.root");
+    }
+
+
+    /**
+     * The builder should have a default path for the root ZNode
+     * @throws Exception
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldNotAcceptNullRootZNodePath() throws Exception {
+        CuratorFramework cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        ZookeeperNodeBuilder builder = new ZookeeperNodeBuilder().
+                withCuratorFramework(cf).
+                withRootPath(null);
+        ZookeeperNode node = (ZookeeperNode) builder.build();
+    }
+
+
+    /**
+     * The builder should have a default path for the root ZNode
+     * @throws Exception
+     */
+    @Test(expected = IllegalArgumentException.class)
+    public void shouldNotAcceptInvalidRootZNodePath() throws Exception {
+        CuratorFramework cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        ZookeeperNodeBuilder builder = new ZookeeperNodeBuilder().
+                withCuratorFramework(cf).
+                withRootPath("invalid/path");
+        ZookeeperNode node = (ZookeeperNode) builder.build();
+    }
+
+    /**
+     * This is not strictly a mock, but good enough for the purposes of the tests here
+     */
     public static class MockCapability implements Capability {
 
     }
-} 
+}

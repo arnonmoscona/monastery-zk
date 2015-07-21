@@ -4,6 +4,7 @@ import net.projectmonastery.monastery.api.core.Capability;
 import net.projectmonastery.monastery.api.core.Node;
 import net.projectmonastery.monastery.zookeeper.capabilities.ZookeeperNodeAnnouncement;
 import org.apache.curator.framework.CuratorFramework;
+import org.apache.zookeeper.common.PathUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -18,10 +19,16 @@ public class ZookeeperNode implements Node<String> {
     private final CuratorFramework curatorFramework;
     private final ArrayList<Capability> capabilities;
     private String id;
+    private String rootPath;
 
-    public ZookeeperNode(CuratorFramework curatorFramework, List<Capability> capabilities) {
+    public ZookeeperNode(CuratorFramework curatorFramework, List<Capability> capabilities, String rootPath) {
+        assert curatorFramework != null : "must provide a CuratorFramework";
+        assert capabilities != null : "must provide a list of capabilities, even if empty";
+        PathUtils.validatePath(rootPath);
+
         this.curatorFramework = curatorFramework;
         this.capabilities = new ArrayList<>(capabilities);
+        this.rootPath = rootPath;
     }
 
     @Override
@@ -71,5 +78,9 @@ public class ZookeeperNode implements Node<String> {
         newCapabilities.addAll(capabilities);
         capabilities.clear();
         capabilities.addAll(newCapabilities);
+    }
+
+    public String getRootPath() {
+        return rootPath;
     }
 }

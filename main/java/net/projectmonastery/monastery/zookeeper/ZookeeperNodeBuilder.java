@@ -8,7 +8,7 @@ import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import org.apache.zookeeper.common.PathUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
@@ -19,6 +19,10 @@ import java.util.List;
  */
 public class ZookeeperNodeBuilder implements NodeBuilder<String> {
     private static final Logger logger = LoggerFactory.getLogger(ZookeeperNodeBuilder.class);
+    /**
+     * The default path to the root znode for the cluster
+     */
+    public static final String DEFAULT_ROOT_PATH = "/net.projectmonastery.monastery.root";
     private CuratorFrameworkFactory curatorFrameworkFactory;
     private ArrayList<Capability> capabilities;
 
@@ -32,6 +36,7 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
      */
     CuratorFrameworkFactory.Builder frameBuilder;
     private String connectionString;
+    private String rootPath = DEFAULT_ROOT_PATH;
 
     public ZookeeperNodeBuilder() {
         capabilities = new ArrayList<>();
@@ -60,16 +65,11 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
         logger.debug("passed conflict validation");
         CuratorFramework cf = appCuratorFramework;
         if (cf == null) {
-            cf = createDefaultCuratorFramework();
+            throw new Exception("No CuratorFramework provided, and not enough information to create a default.");
         }
-        ZookeeperNode node = new ZookeeperNode(cf, capabilities);
+        ZookeeperNode node = new ZookeeperNode(cf, capabilities, rootPath);
         node.prependCapability(new ZookeeperNodeAnnouncement(node));
         return node;
-    }
-
-    private CuratorFramework createDefaultCuratorFramework() {
-        logger.debug("creating a default curator framework...");
-        return null; // FIXME create a CuratorFramework
     }
 
     /**
@@ -103,5 +103,11 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
 
     private void initFieldsFromFramework(CuratorFramework cf) {
         connectionString = cf.getZookeeperClient().getCurrentConnectionString();
+    }
+
+    public ZookeeperNodeBuilder withRootPath(String rootPath) {
+        PathUtils.validatePath(rootPath);
+        this.rootPath = rootPath;
+        return this;
     }
 }
