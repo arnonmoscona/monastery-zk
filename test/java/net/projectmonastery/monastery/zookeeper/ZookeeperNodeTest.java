@@ -1,8 +1,20 @@
 package net.projectmonastery.monastery.zookeeper; 
 
-import org.junit.Test; 
-import org.junit.Before; 
-import org.junit.After; 
+import net.projectmonastery.monastery.api.core.Capability;
+import net.projectmonastery.monastery.api.core.Node;
+import net.projectmonastery.monastery.cando.NodeAnnouncement;
+import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.retry.RetryOneTime;
+import org.apache.curator.test.TestingServer;
+import org.junit.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
+
 import static org.junit.Assert.*;
 import static org.fest.assertions.api.Assertions.*;
 
@@ -13,25 +25,65 @@ import static org.fest.assertions.api.Assertions.*;
 * @since <pre>Jul 13, 2015</pre> 
 * @version 1.0 
 */ 
-public class ZookeeperNodeTest { 
+public class ZookeeperNodeTest {
+    public static final int MS_BETWEEN_RETRY = 100;
+    private static Logger logger = LoggerFactory.getLogger(ZookeeperNodeBuilderTest.class);
+    private static TestingServer server;
+    private static String connectionString;
+    private static ZookeeperNodeBuilder builder;
+    private static ZookeeperNode node;
+    private static CuratorFramework cf;
+
+    /**
+     * Only need one test server instance (expensive to start, and no state between tests in this class)
+     * @throws Exception
+     */
+    @BeforeClass
+    public static void beforeAll() throws Exception {
+        server = new TestingServer(true);
+        connectionString = server.getConnectString();
+        logger.debug("Connection string: " + connectionString);
+
+        // OK, starting and stopping and connecting on every test is overkill for this test class,
+        // as the node is (nearly) immutable and there is no point is waiting so long before each test
+        prepareForTest();
+    }
+
+    @AfterClass
+    public static void afterAll() throws Exception {
+        cf.close();
+        server.stop();
+        logger.debug("shutting down...");
+    }
 
     @Before
-    public void before() throws Exception { 
-    } 
+    public void before() throws Exception {
+    }
+
+    private static void prepareForTest() throws Exception {
+        server.start();
+        cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        cf.start();
+        cf.blockUntilConnected(5000, TimeUnit.MILLISECONDS);
+        builder = new ZookeeperNodeBuilder()
+            .withCuratorFramework(cf)
+        .withConnectionTimeoutMillis(-1); // block until connected
+        node = (ZookeeperNode) builder.build();
+        assertThat(node).isNotNull();
+    }
 
     @After
-    public void after() throws Exception { 
-    } 
+    public void after() throws Exception {
+    }
 
     /** 
      * 
-     * Method: getId() 
+     * Method: getId() should not be present until announced
      * 
      */ 
     @Test
     public void testGetId() throws Exception { 
-        throw new Exception("missing test for getId");
-        //TODO: Test goes here... 
+        assertThat(node.getId().isPresent()).isFalse();
     } 
 
     /** 
@@ -40,9 +92,11 @@ public class ZookeeperNodeTest {
      * 
      */ 
     @Test
-    public void testGetCapability() throws Exception { 
-        throw new Exception("missing test for getCapability");
-        //TODO: Test goes here... 
+    public void testGetCapability() throws Exception {
+        CompletableFuture<NodeAnnouncement> future = node.getCapability(NodeAnnouncement.class);
+        assertThat(future).isNotNull();
+        NodeAnnouncement result = future.get(1000, TimeUnit.MILLISECONDS); // synchronous is OK in test, besides we expect no network operations in this implementation
+        assertThat(result).isNotNull();
     } 
 
     /** 
@@ -51,9 +105,11 @@ public class ZookeeperNodeTest {
      * 
      */ 
     @Test
-    public void testGetCapabilities() throws Exception { 
-        throw new Exception("missing test for getCapabilities");
-        //TODO: Test goes here... 
+    public void testGetCapabilities() throws Exception {
+        List<Capability> capabilities = node.getCapabilities();
+        assertThat(capabilities).isNotNull();
+        assertThat(capabilities.size()).isGreaterThanOrEqualTo(1);
+        assertThat(capabilities.get(0)).isNotNull();
     } 
 
     /** 
@@ -63,8 +119,7 @@ public class ZookeeperNodeTest {
      */ 
     @Test
     public void testGetConnectionString() throws Exception { 
-        throw new Exception("missing test for getConnectionString");
-        //TODO: Test goes here... 
+        assertThat(node.getConnectionString()).isEqualTo(connectionString);
     } 
 
     /** 
@@ -74,8 +129,7 @@ public class ZookeeperNodeTest {
      */ 
     @Test
     public void testGetCuratorFramework() throws Exception { 
-        throw new Exception("missing test for getCuratorFramework");
-        //TODO: Test goes here... 
+        assertThat(node.getCuratorFramework()).isEqualTo(cf);
     } 
 
     /** 
@@ -85,9 +139,19 @@ public class ZookeeperNodeTest {
      */ 
     @Test
     public void testPrependCapability() throws Exception { 
-        throw new Exception("missing test for prependCapability");
-        //TODO: Test goes here... 
-    } 
+        Capability nullCapability = new Capability() {
+            @Override
+            public void bind(Node<?> context) {
+                // do nothing
+            }
+        };
+        node.prependCapability(nullCapability);
+        Capability firstCapability = node.getCapabilities().get(0);
+        assertThat(firstCapability).isEqualTo(nullCapability);
+    }
 
-
-} 
+    @Test
+    public void testGetRootPath() throws Exception {
+        assertThat(node.getRootPath()).isEqualTo(ZookeeperNodeBuilder.DEFAULT_ROOT_PATH);
+    }
+}

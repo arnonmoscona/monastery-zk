@@ -4,6 +4,7 @@ import net.projectmonastery.monastery.api.core.Capability;
 import net.projectmonastery.monastery.api.core.Node;
 import net.projectmonastery.monastery.zookeeper.capabilities.ZookeeperNodeAnnouncement;
 import org.apache.curator.framework.CuratorFramework;
+import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.apache.zookeeper.common.PathUtils;
 
 import java.util.ArrayList;
@@ -18,17 +19,22 @@ import java.util.concurrent.CompletableFuture;
 public class ZookeeperNode implements Node<String> {
     private final CuratorFramework curatorFramework;
     private final ArrayList<Capability> capabilities;
+    private final String connectionString;
     private String id;
     private String rootPath;
 
-    public ZookeeperNode(CuratorFramework curatorFramework, List<Capability> capabilities, String rootPath) {
+    public ZookeeperNode(CuratorFramework curatorFramework, String connectionString, List<Capability> capabilities, String rootPath) {
         assert curatorFramework != null : "must provide a CuratorFramework";
+        assert connectionString != null : "must have a connection string";
         assert capabilities != null : "must provide a list of capabilities, even if empty";
         PathUtils.validatePath(rootPath);
+        assert curatorFramework.getState().equals(CuratorFrameworkState.STARTED) : "cannot create node with a framework that is not started";
 
         this.curatorFramework = curatorFramework;
         this.capabilities = new ArrayList<>(capabilities);
         this.rootPath = rootPath;
+//        this.connectionString = connectionString;
+        this.connectionString = curatorFramework.getZookeeperClient().getCurrentConnectionString();
     }
 
     @Override
@@ -55,12 +61,12 @@ public class ZookeeperNode implements Node<String> {
 
     @Override
     public List<Capability> getCapabilities() {
-        return null;
+        return new ArrayList<>(capabilities);
     }
 
     @Override
     public String getConnectionString() {
-        return null;
+        return connectionString;
     }
 
     public CuratorFramework getCuratorFramework() {

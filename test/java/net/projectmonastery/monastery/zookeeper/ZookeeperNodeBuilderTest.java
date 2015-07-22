@@ -17,8 +17,6 @@ import org.apache.curator.test.TestingServer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.io.IOException;
-import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -31,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 */ 
 public class ZookeeperNodeBuilderTest {
     public static final int MS_BETWEEN_RETRY = 100;
-    static Logger logger = LoggerFactory.getLogger(ZookeeperNodeBuilderTest.class);
+    private static Logger logger = LoggerFactory.getLogger(ZookeeperNodeBuilderTest.class);
     private static TestingServer server;
     private static String connectionString;
 
@@ -155,9 +153,11 @@ public class ZookeeperNodeBuilderTest {
      * Method: build() 
      * 
      */ 
-    @Test
+    @Test(timeout = 120000)
     public void testBuild() throws Exception {
         CuratorFramework cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        cf.start();
+        cf.blockUntilConnected();
         ZookeeperNodeBuilder builder = new ZookeeperNodeBuilder().
                 withCuratorFramework(cf);
         ZookeeperNode node = (ZookeeperNode) builder.build();
@@ -167,6 +167,18 @@ public class ZookeeperNodeBuilderTest {
         assertThat(future).isNotNull();
         NodeAnnouncement result = future.get(1000, TimeUnit.MILLISECONDS); // synchronous is OK in test, besides we expect no network operations in this implementation
         assertThat(result).isNotNull();
+        assertThat(node.getCapabilities().size()).isEqualTo(1); // exact number of default capabilities
+    }
+
+    @Test(timeout = 120000, expected = Exception.class)
+    public void testWithConnectionTimeout() throws Exception {
+        CuratorFramework cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        ZookeeperNodeBuilder builder = new ZookeeperNodeBuilder()
+                .withCuratorFramework(cf)
+                .withConnectionTimeoutMillis(1); // provide the smallest timeout possible
+        ZookeeperNode node = (ZookeeperNode) builder.build();
+        assertThat(node).isNotNull();
+
     }
 
     /**
@@ -192,9 +204,11 @@ public class ZookeeperNodeBuilderTest {
      * The builder should accept a root path for the root ZNode
      * @throws Exception
      */
-    @Test
+    @Test(timeout = 120000)
     public void shouldAcceptRootZNodePath() throws Exception {
         CuratorFramework cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        cf.start();
+        cf.blockUntilConnected();
         String rootPath = "/my/root/path";
         ZookeeperNodeBuilder builder = new ZookeeperNodeBuilder().
                 withCuratorFramework(cf).
@@ -209,9 +223,11 @@ public class ZookeeperNodeBuilderTest {
      * The builder should have a default path for the root ZNode
      * @throws Exception
      */
-    @Test
+    @Test(timeout = 120000)
     public void shouldHaveDefaultRootZNodePath() throws Exception {
         CuratorFramework cf = CuratorFrameworkFactory.newClient(connectionString, new RetryOneTime(MS_BETWEEN_RETRY));
+        cf.start();
+        cf.blockUntilConnected();
         ZookeeperNodeBuilder builder = new ZookeeperNodeBuilder().
                 withCuratorFramework(cf);
         ZookeeperNode node = (ZookeeperNode) builder.build();

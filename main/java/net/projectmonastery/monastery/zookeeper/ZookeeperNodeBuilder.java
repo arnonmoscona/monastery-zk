@@ -6,12 +6,18 @@ import net.projectmonastery.monastery.api.core.NodeBuilder;
 import net.projectmonastery.monastery.zookeeper.capabilities.ZookeeperNodeAnnouncement;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.CuratorFrameworkFactory;
+import org.apache.curator.framework.imps.CuratorFrameworkState;
+import org.apache.curator.framework.state.ConnectionState;
+import org.apache.curator.framework.state.ConnectionStateListener;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.apache.zookeeper.common.PathUtils;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 /**
  * Created by Arnon Moscona on 6/17/2015.
@@ -23,7 +29,7 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
      * The default path to the root znode for the cluster
      */
     public static final String DEFAULT_ROOT_PATH = "/net.projectmonastery.monastery.root";
-    private CuratorFrameworkFactory curatorFrameworkFactory;
+    public static final int DEFAULT_CONNECTION_TIMEOUT_MILLIS = 60000;
     private ArrayList<Capability> capabilities;
 
     /**
@@ -34,9 +40,10 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
      * If given then this builder will be used to create the Curator framework.
      * Cannot coexist with a given framework
      */
-    CuratorFrameworkFactory.Builder frameBuilder;
+    private CuratorFrameworkFactory.Builder frameBuilder;
     private String connectionString;
     private String rootPath = DEFAULT_ROOT_PATH;
+    private int connectionTimeout = DEFAULT_CONNECTION_TIMEOUT_MILLIS;
 
     public ZookeeperNodeBuilder() {
         capabilities = new ArrayList<>();
@@ -67,9 +74,56 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
         if (cf == null) {
             throw new Exception("No CuratorFramework provided, and not enough information to create a default.");
         }
-        ZookeeperNode node = new ZookeeperNode(cf, capabilities, rootPath);
+        logger.debug("checking framework state");
+        CuratorFrameworkState state = cf.getState();
+        logger.debug("Got state: " + state);
+        if (!state.equals(CuratorFrameworkState.STARTED)) {
+            startFramework(cf, connectionTimeout);
+        }
+        ZookeeperNode node = new ZookeeperNode(cf, connectionString, capabilities, rootPath);
         node.prependCapability(new ZookeeperNodeAnnouncement(node));
         return node;
+    }
+
+    private void startFramework(CuratorFramework cf, int timeoutMillis) throws Exception {
+        if (cf.getState().equals(CuratorFrameworkState.STARTED)) {
+            return;
+        }
+
+        logger.info("Connecting with timeout "+timeoutMillis+" millis");
+        CountDownLatch latch = new CountDownLatch(1); // this allows blocking until connected
+        AtomicReference<ConnectionState> lastConnectionState = new AtomicReference<>();
+
+        cf.getConnectionStateListenable().addListener(new ConnectionStateListener() {
+            @Override
+            public void stateChanged(CuratorFramework curatorFramework, ConnectionState connectionState) {
+                lastConnectionState.set(connectionState);
+                if (connectionState.equals(ConnectionState.CONNECTED)) {
+                    latch.countDown();
+                }
+            }
+        });
+        cf.start(); // this should connect us
+
+        if (!cf.getZookeeperClient().isConnected()) { // maybe already connected by now
+            if (connectionTimeout <= 0) {
+                logger.debug("blocking indefinitely until connected");
+                cf.blockUntilConnected();
+            } else {
+                logger.debug("blocking with timeout of " + timeoutMillis + " millis");
+                cf.blockUntilConnected(timeoutMillis, TimeUnit.MILLISECONDS);
+            }
+        }
+
+        if (!cf.getZookeeperClient().isConnected()) {
+            throw new Exception("Failed to connect to Zookeeper. Framework state: " + cf.getState() +
+            " connection state: "+lastConnectionState.get());
+        }
+
+        if (!cf.getState().equals(CuratorFrameworkState.STARTED)) {
+            throw new Exception("framework state is not STARTED after connecting. Got state: "
+            + cf.getState());
+        }
     }
 
     /**
@@ -108,6 +162,11 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
     public ZookeeperNodeBuilder withRootPath(String rootPath) {
         PathUtils.validatePath(rootPath);
         this.rootPath = rootPath;
+        return this;
+    }
+
+    public ZookeeperNodeBuilder withConnectionTimeoutMillis(int timeout) {
+        connectionTimeout = timeout;
         return this;
     }
 }
