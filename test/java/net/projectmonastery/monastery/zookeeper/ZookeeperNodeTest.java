@@ -8,6 +8,7 @@ import org.apache.curator.framework.CuratorFrameworkFactory;
 import org.apache.curator.retry.RetryOneTime;
 import org.apache.curator.test.TestingServer;
 import org.junit.*;
+import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,8 +25,9 @@ import static org.fest.assertions.api.Assertions.*;
 * @author Arnon Moscona 
 * @since <pre>Jul 13, 2015</pre> 
 * @version 1.0 
-*/ 
-public class ZookeeperNodeTest {
+*/
+@Category(IntegrationTestCategory.class)
+public class ZookeeperNodeTest implements IntegrationTestClassMarker {
     public static final int MS_BETWEEN_RETRY = 100;
     private static Logger logger = LoggerFactory.getLogger(ZookeeperNodeBuilderTest.class);
     private static TestingServer server;

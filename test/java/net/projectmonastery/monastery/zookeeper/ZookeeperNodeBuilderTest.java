@@ -14,6 +14,7 @@ import org.junit.Ignore;
 
 import static org.fest.assertions.api.Assertions.*;
 import org.apache.curator.test.TestingServer;
+import org.junit.experimental.categories.Category;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -26,8 +27,9 @@ import java.util.concurrent.TimeUnit;
 * @author Arnon Moscona 
 * @since <pre>Jun 20, 2015</pre> 
 * @version 1.0 
-*/ 
-public class ZookeeperNodeBuilderTest {
+*/
+@Category(IntegrationTestCategory.class)
+public class ZookeeperNodeBuilderTest implements IntegrationTestClassMarker {
     public static final int MS_BETWEEN_RETRY = 100;
     private static Logger logger = LoggerFactory.getLogger(ZookeeperNodeBuilderTest.class);
     private static TestingServer server;
@@ -36,10 +38,16 @@ public class ZookeeperNodeBuilderTest {
     /**
      * Only need one test server instance (expensive to start, and no state between tests in this class)
      * @throws Exception
+     *
+     * IMPORTANT: due to the fact that there really isn't any coupling of tests with the zookeeper
+     * server instance state, then to make things faster and more reliable, we start the server at
+     * the beginning and stop it at the end.
+     * A test that wants to ensure a fresh state should do a <pre>server.restart()</pre>
      */
     @BeforeClass
     public static void beforeAll() throws Exception {
         server = new TestingServer(true);
+        server.start();
         connectionString = server.getConnectString();
         logger.debug("Connection string: " + connectionString);
 
@@ -48,24 +56,25 @@ public class ZookeeperNodeBuilderTest {
     @AfterClass
     public static void afterAll() throws Exception {
         logger.debug("shutting down...");
+        server.stop();
     }
 
     @Before
     public void before() throws Exception {
-        server.start();
+//        server.start();
     }
 
     @After
     public void after() throws Exception {
-        try {
-            if (server != null) {
-                server.stop();
-            } else {
-                System.err.println("sever is null in after() - very strange");
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+//        try {
+//            if (server != null) {
+//                server.stop();
+//            } else {
+//                System.err.println("sever is null in after() - very strange");
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
     }
 
     //------------------------------------------------------------------------------------------------------------------
