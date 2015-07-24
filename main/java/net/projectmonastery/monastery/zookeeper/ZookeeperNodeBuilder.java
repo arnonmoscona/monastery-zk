@@ -47,6 +47,7 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
 
     public ZookeeperNodeBuilder() {
         capabilities = new ArrayList<>();
+        capabilities.add(new ZookeeperNodeAnnouncement());
     }
 
     @Override
@@ -80,9 +81,7 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
         if (!state.equals(CuratorFrameworkState.STARTED)) {
             startFramework(cf, connectionTimeout);
         }
-        ZookeeperNode node = new ZookeeperNode(cf, connectionString, capabilities, rootPath);
-        node.prependCapability(new ZookeeperNodeAnnouncement(node));
-        return node;
+        return new ZookeeperNode(cf, connectionString, capabilities, rootPath);
     }
 
     private void startFramework(CuratorFramework cf, int timeoutMillis) throws Exception {
@@ -94,13 +93,10 @@ public class ZookeeperNodeBuilder implements NodeBuilder<String> {
         CountDownLatch latch = new CountDownLatch(1); // this allows blocking until connected
         AtomicReference<ConnectionState> lastConnectionState = new AtomicReference<>();
 
-        cf.getConnectionStateListenable().addListener(new ConnectionStateListener() {
-            @Override
-            public void stateChanged(CuratorFramework curatorFramework, ConnectionState connectionState) {
-                lastConnectionState.set(connectionState);
-                if (connectionState.equals(ConnectionState.CONNECTED)) {
-                    latch.countDown();
-                }
+        cf.getConnectionStateListenable().addListener((curatorFramework, connectionState) -> {
+            lastConnectionState.set(connectionState);
+            if (connectionState.equals(ConnectionState.CONNECTED)) {
+                latch.countDown();
             }
         });
         cf.start(); // this should connect us

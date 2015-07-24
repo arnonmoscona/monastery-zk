@@ -2,7 +2,6 @@ package net.projectmonastery.monastery.zookeeper;
 
 import net.projectmonastery.monastery.api.core.Capability;
 import net.projectmonastery.monastery.api.core.Node;
-import net.projectmonastery.monastery.zookeeper.capabilities.ZookeeperNodeAnnouncement;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.apache.zookeeper.common.PathUtils;
@@ -35,6 +34,30 @@ public class ZookeeperNode implements Node<String> {
         this.rootPath = rootPath;
 //        this.connectionString = connectionString;
         this.connectionString = curatorFramework.getZookeeperClient().getCurrentConnectionString();
+        bindAllCapabilities();
+        resolveCapabilityDependencies();
+        validateCapabilityState();
+    }
+
+    /**
+     * binds all capabilities to this instance
+     */
+    private void bindAllCapabilities() {
+        capabilities.forEach(capability -> capability.bind(this));
+    }
+
+    /**
+     * After all capabilities are bound, let them know so they can find their dependencies and resolve
+     */
+    private void resolveCapabilityDependencies() {
+        capabilities.forEach(Capability::onAllCapabilitiesBound);
+    }
+
+    private void validateCapabilityState() {
+        capabilities.forEach(capability -> {
+            String name = capability.getClass().getSimpleName();
+            assert capability.isReady() : "after binding all capabilities "+name+"is not ready";
+        });
     }
 
     @Override
@@ -55,7 +78,7 @@ public class ZookeeperNode implements Node<String> {
             }
         }
 
-        future.completeExceptionally(new Exception("cannot find a capability matching "+capabilityClass.getName()));
+        future.completeExceptionally(new Exception("cannot find a capability matching " + capabilityClass.getName()));
         return future;
     }
 
@@ -88,5 +111,14 @@ public class ZookeeperNode implements Node<String> {
 
     public String getRootPath() {
         return rootPath;
+    }
+
+    /**
+     * This is part of the implementation and should not be used outside the implementation code
+     * @param newId the new ID to assign to the node (write once)
+     */
+    public void setId(String newId) {
+        assert id == null : "Node already has an ID. May not be changed.";
+        id = newId;
     }
 }

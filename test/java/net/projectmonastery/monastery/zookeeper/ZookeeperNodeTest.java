@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit;
 
 import static org.junit.Assert.*;
 import static org.fest.assertions.api.Assertions.*;
+import static org.mockito.Mockito.*;
 
 /** 
 * ZookeeperNode Tester. 
@@ -155,5 +156,39 @@ public class ZookeeperNodeTest implements IntegrationTestClassMarker {
     @Test
     public void testGetRootPath() throws Exception {
         assertThat(node.getRootPath()).isEqualTo(ZookeeperNodeBuilder.DEFAULT_ROOT_PATH);
+    }
+
+    @Test
+    public void testCapabilityBinding() throws Exception {
+        Capability cap1 = mock(Capability.class);
+        when(cap1.isReady()).thenReturn(true);
+
+        builder = (ZookeeperNodeBuilder) new ZookeeperNodeBuilder()
+                .withCuratorFramework(cf)
+                .withConnectionTimeoutMillis(-1) // block until connected
+                .withCapability(cap1);
+        node = (ZookeeperNode) builder.build();
+        assertThat(node).isNotNull();
+
+        verify(cap1, times(1)).bind(node);
+        verify(cap1, times(1)).onAllCapabilitiesBound();
+        verify(cap1, times(1)).isReady();
+    }
+
+    @Test(expected = AssertionError.class)
+    public void testBadCapabilityBinding() throws Exception {
+        Capability cap1 = mock(Capability.class);
+        when(cap1.isReady()).thenReturn(false); // the capability reports that it is not ready
+
+        builder = (ZookeeperNodeBuilder) new ZookeeperNodeBuilder()
+                .withCuratorFramework(cf)
+                .withConnectionTimeoutMillis(-1) // block until connected
+                .withCapability(cap1);
+        node = (ZookeeperNode) builder.build();
+        assertThat(node).isNotNull();
+
+        verify(cap1, times(1)).bind(node);
+        verify(cap1, times(1)).onAllCapabilitiesBound();
+        verify(cap1, times(1)).isReady();
     }
 }
