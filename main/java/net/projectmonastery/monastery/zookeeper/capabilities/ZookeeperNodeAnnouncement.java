@@ -9,6 +9,7 @@ import org.apache.curator.framework.CuratorFramework;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
@@ -22,12 +23,14 @@ public class ZookeeperNodeAnnouncement implements NodeAnnouncement<String> {
     private CuratorFramework curatorFramework;
     private ZookeeperNode parentNode;
     private NodeRegistry registry;
+    private ArrayList<Consumer<Node<String>>> joinListeners;
 
     public ZookeeperNodeAnnouncement() {
-
+        joinListeners = new ArrayList<>();
     }
 
     public ZookeeperNodeAnnouncement(ZookeeperNode node) {
+        this();
         bind(node);
     }
 
@@ -40,24 +43,33 @@ public class ZookeeperNodeAnnouncement implements NodeAnnouncement<String> {
         return new NodeRegistry(curatorFramework, parentNode.getRootPath());
     }
 
+    public void setState(NodeState state) {
+        parentNode.setState(state);
+    }
+
     @Override
     public NodeState getState() {
-        return NodeState.DISCONNECTED;
+        return parentNode.getState();
     }
 
     @Override
     public CompletableFuture<NodeAnnouncement<String>> announce() {
+        assert parentNode.getState().equals(NodeState.DISCONNECTED) : "may not announce a node unless it is in a DISCONNECTED state";
+
         CompletableFuture<NodeAnnouncement<String>> future = new CompletableFuture<>(); // this is what we will return
-        CompletableFuture.runAsync(()->{ // this task will complete the future
+        CompletableFuture.runAsync(() -> { // this task will complete the future
             try {
                 String newId = registry.makeNewNode();
                 ZookeeperNodeAnnouncement.this.setId(newId);
+                ZookeeperNodeAnnouncement.this.setState(NodeState.ANNOUNCED); // this is done only for the benefit of listeners
+                ZookeeperNodeAnnouncement.this.setState(NodeState.JOINED);
+                ZookeeperNodeAnnouncement.this.invokeJoinListeners();
 
                 logger.debug("Completing the announcement process");
                 future.complete(ZookeeperNodeAnnouncement.this);
                 logger.debug("Completed announcement");
             } catch (Exception e) {
-                logger.error("Trouble completing the future: "+e.getMessage(), e);
+                logger.error("Trouble completing the future: " + e.getMessage(), e);
                 future.completeExceptionally(e);
             }
         });
@@ -83,7 +95,15 @@ public class ZookeeperNodeAnnouncement implements NodeAnnouncement<String> {
 
     @Override
     public NodeAnnouncement<String> addJoinListener(Consumer<Node<String>> consumer) {
-        return null;
+        joinListeners.add(consumer);
+        return this;
+    }
+
+    private void invokeJoinListeners() {
+        if (joinListeners == null || joinListeners.size() == 0) {
+            return;
+        }
+        joinListeners.forEach(listener -> listener.accept(parentNode));
     }
 
     @Override

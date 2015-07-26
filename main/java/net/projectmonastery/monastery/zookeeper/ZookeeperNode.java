@@ -2,6 +2,7 @@ package net.projectmonastery.monastery.zookeeper;
 
 import net.projectmonastery.monastery.api.core.Capability;
 import net.projectmonastery.monastery.api.core.Node;
+import net.projectmonastery.monastery.cando.NodeState;
 import org.apache.curator.framework.CuratorFramework;
 import org.apache.curator.framework.imps.CuratorFrameworkState;
 import org.apache.zookeeper.common.PathUtils;
@@ -21,6 +22,7 @@ public class ZookeeperNode implements Node<String> {
     private final String connectionString;
     private String id;
     private String rootPath;
+    private NodeState state = NodeState.DISCONNECTED;
 
     public ZookeeperNode(CuratorFramework curatorFramework, String connectionString, List<Capability> capabilities, String rootPath) {
         assert curatorFramework != null : "must provide a CuratorFramework";
@@ -34,6 +36,7 @@ public class ZookeeperNode implements Node<String> {
         this.rootPath = rootPath;
 //        this.connectionString = connectionString;
         this.connectionString = curatorFramework.getZookeeperClient().getCurrentConnectionString();
+        state = NodeState.DISCONNECTED;
         bindAllCapabilities();
         resolveCapabilityDependencies();
         validateCapabilityState();
@@ -120,5 +123,20 @@ public class ZookeeperNode implements Node<String> {
     public void setId(String newId) {
         assert id == null : "Node already has an ID. May not be changed.";
         id = newId;
+    }
+
+    /**
+     * To be used only by Monastery implementation classes
+     * @param state the new state
+     */
+    public void setState(NodeState state) {
+        this.state = state==null?NodeState.DISCONNECTED:state;
+    }
+
+    /**
+     * @return the node state with respect to announcement
+     */
+    public NodeState getState() {
+        return state;
     }
 }
