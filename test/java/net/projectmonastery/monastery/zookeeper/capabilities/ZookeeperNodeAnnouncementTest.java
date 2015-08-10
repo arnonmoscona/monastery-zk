@@ -3,12 +3,14 @@ package net.projectmonastery.monastery.zookeeper.capabilities;
 import net.projectmonastery.monastery.api.core.Node;
 import net.projectmonastery.monastery.cando.NodeAnnouncement;
 import net.projectmonastery.monastery.cando.NodeState;
+import net.projectmonastery.monastery.zookeeper.UnitTests;
 import net.projectmonastery.monastery.zookeeper.ZookeeperNode;
 import net.projectmonastery.monastery.zookeeper.data.NodeRegistry;
 import org.apache.curator.framework.CuratorFramework;
 import org.junit.Test;
 import org.junit.Before;
 import org.junit.After;
+import org.junit.experimental.categories.Category;
 import org.mockito.InOrder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,8 +54,8 @@ public class ZookeeperNodeAnnouncementTest {
 
         registry = mock(NodeRegistry.class);  // a new mock registry
         when(registry.makeNewNode())
-                .thenReturn(ID1)
-                .thenReturn(ID2);
+                .thenReturn(CompletableFuture.completedFuture(ID1))
+                .thenReturn(CompletableFuture.completedFuture(ID2));
     }
 
     @After

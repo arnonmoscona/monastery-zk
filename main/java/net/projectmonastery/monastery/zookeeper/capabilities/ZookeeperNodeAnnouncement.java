@@ -58,20 +58,25 @@ public class ZookeeperNodeAnnouncement implements NodeAnnouncement<String> {
 
         CompletableFuture<NodeAnnouncement<String>> future = new CompletableFuture<>(); // this is what we will return
         CompletableFuture.runAsync(() -> { // this task will complete the future
-            try {
-                String newId = registry.makeNewNode();
-                ZookeeperNodeAnnouncement.this.setId(newId);
-                ZookeeperNodeAnnouncement.this.setState(NodeState.ANNOUNCED); // this is done only for the benefit of listeners
-                ZookeeperNodeAnnouncement.this.setState(NodeState.JOINED);
-                ZookeeperNodeAnnouncement.this.invokeJoinListeners();
+            CompletableFuture<String> newId = registry.makeNewNode();
+            newId.handle((id, throwable) -> {
+                if (throwable != null) {
+                    logger.error("Trouble completing the future: " + throwable.getMessage(), throwable);
+                    future.completeExceptionally(throwable);
+                    return null;
+                }
+                else {
+                    ZookeeperNodeAnnouncement.this.setId(id);
+                    ZookeeperNodeAnnouncement.this.setState(NodeState.ANNOUNCED); // this is done only for the benefit of listeners
+                    ZookeeperNodeAnnouncement.this.setState(NodeState.JOINED);
+                    ZookeeperNodeAnnouncement.this.invokeJoinListeners();
 
-                logger.debug("Completing the announcement process");
-                future.complete(ZookeeperNodeAnnouncement.this);
-                logger.debug("Completed announcement");
-            } catch (Exception e) {
-                logger.error("Trouble completing the future: " + e.getMessage(), e);
-                future.completeExceptionally(e);
-            }
+                    logger.debug("Completing the announcement process");
+                    future.complete(ZookeeperNodeAnnouncement.this);
+                    logger.debug("Completed announcement");
+                    return id;
+                }
+            });
         });
 
         return future;

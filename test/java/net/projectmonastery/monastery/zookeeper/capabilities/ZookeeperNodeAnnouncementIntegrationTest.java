@@ -21,6 +21,6 @@ import net.projectmonastery.monastery.zookeeper.IntegrationTestClassMarker;
 public class ZookeeperNodeAnnouncementIntegrationTest implements IntegrationTestClassMarker {
     @Test
     public void reminder() throws Exception {
-        throw new Exception("still need an integration test");
+        throw new Exception("still need an integration test (with a real zookeeper and a real node registry)");
     }
 }
