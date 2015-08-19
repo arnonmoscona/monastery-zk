@@ -58,8 +58,7 @@ public class ZookeeperNodeAnnouncement implements NodeAnnouncement<String> {
 
         CompletableFuture<NodeAnnouncement<String>> future = new CompletableFuture<>(); // this is what we will return
         CompletableFuture.runAsync(() -> { // this task will complete the future
-            CompletableFuture<String> newId = registry.makeNewNode();
-            newId.handle((id, throwable) -> {
+            registry.makeNewNode().handle((id, throwable) -> {
                 if (throwable != null) {
                     logger.error("Trouble completing the future: " + throwable.getMessage(), throwable);
                     future.completeExceptionally(throwable);

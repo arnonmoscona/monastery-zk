@@ -72,7 +72,7 @@ public class ZookeeperNode implements Node<String> {
     public <T extends Capability> CompletableFuture<T> getCapability(Class<T> capabilityClass) {
         // in this case we do no network operations and the lookup is fast, so no need to throw this on a background thread...
 
-        CompletableFuture<T> future = new CompletableFuture<>();
+        CompletableFuture<T> future = new CompletableFuture<>(); // we cannot use supplyAsync because we want to complete exceptionally
 
         for (Capability capability: capabilities) {
             if (capabilityClass.isAssignableFrom(capability.getClass())) {
